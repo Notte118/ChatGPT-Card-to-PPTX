@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT 卡片导出 PPTX
+// @name:en      ChatGPT Card to PPTX
 // @namespace    local.chatgpt-card-export
-// @version      0.1.5
+// @version      0.1.6
 // @author       Notte118
 // @license      MIT
 // @homepageURL  https://github.com/Notte118/ChatGPT-Card-to-PPTX
@@ -9,10 +10,13 @@
 // @updateURL    https://raw.githubusercontent.com/Notte118/ChatGPT-Card-to-PPTX/main/chatgpt-card-export.user.js
 // @downloadURL  https://raw.githubusercontent.com/Notte118/ChatGPT-Card-to-PPTX/main/chatgpt-card-export.user.js
 // @description  点选 ChatGPT 页面区域，导出可编辑的 PPTX
+// @description:en Select a ChatGPT card or page region and export an editable PPTX.
 // @match        https://chatgpt.com/*
 // @require      https://cdn.jsdelivr.net/npm/dom-to-pptx@2.1.2/dist/dom-to-pptx.bundle.js
 // @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
 // @grant        GM_registerMenuCommand
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @sandbox      DOM
 // @run-at       document-idle
 // @noframes
@@ -76,38 +80,108 @@ async function forcePptxFont(blob) {
   let includePseudoElements = false;
   let needsReload = false;
   const history = [];
+  let language = GM_getValue('language', 'zh') === 'en' ? 'en' : 'zh';
+  let statusKey = 'ready';
+  let statusArgs = [];
+  const messages = {
+    zh: {
+      pick: '选择区域', parent: '扩大到父级', back: '缩回一级',
+      export: '导出 PPTX', cancel: '取消 / Esc',
+      pseudo: () => `装饰：${includePseudoElements ? '开' : '关'}`,
+      pseudoOn: '包含 ::before/::after 装饰；复杂装饰可能需要截图，耗时更长。',
+      pseudoOff: '跳过 ::before/::after 装饰；保留普通文字、形状和 SVG。',
+      ready: '点击“选择区域”，再点击需要导出的卡片。',
+      picking: '移动鼠标查看蓝框，点击选中；Esc 取消。',
+      selected: (name, w, h) => `已选择 ${name}\n${w} × ${h} px。确认蓝框范围，再导出。`,
+      fonts: '等待字体', images: '等待图片', converting: '转换 PPTX', font: '统一字体',
+      waitingFonts: '正在等待页面字体加载……',
+      waitingImages: '正在等待所选区域的图片加载……',
+      convertingPptx: '正在转换 PPTX，请等待；大型区域可能需要更长时间。',
+      settingFont: '正在统一为 Microsoft YaHei UI 字体……',
+      missingTarget: '目标已消失或被隐藏，请重新选择。',
+      timeout: (stage, seconds) => `${translate(stage)}超过 ${seconds} 秒。底层任务无法中断，请刷新页面后重试。`,
+      success: '已生成 PPTX 并发起下载。请检查 Chrome 下载列表及 PPT 中的文字、图标。',
+      error: message => `导出失败：${message}`,
+      missingLibrary: '转换库未加载。请检查 Tampermonkey 的 @require 下载状态，再刷新页面。',
+    },
+    en: {
+      pick: 'Select region', parent: 'Select parent', back: 'Go back',
+      export: 'Export PPTX', cancel: 'Cancel / Esc',
+      pseudo: () => `Decorations: ${includePseudoElements ? 'On' : 'Off'}`,
+      pseudoOn: 'Include ::before/::after decorations. Complex decorations may require screenshots and take longer.',
+      pseudoOff: 'Skip ::before/::after decorations. Keep regular text, shapes and SVGs.',
+      ready: 'Click “Select region”, then click the card to export.',
+      picking: 'Move the mouse to preview the blue outline. Click to select; Esc to cancel.',
+      selected: (name, w, h) => `Selected ${name}\n${w} × ${h} px. Check the blue outline before exporting.`,
+      fonts: 'Loading fonts', images: 'Loading images', converting: 'PPTX conversion', font: 'Font normalization',
+      waitingFonts: 'Waiting for page fonts to load…',
+      waitingImages: 'Waiting for images in the selected region to load…',
+      convertingPptx: 'Converting to PPTX. Larger regions may take longer.',
+      settingFont: 'Setting the font to Microsoft YaHei UI…',
+      missingTarget: 'The target has disappeared or is hidden. Please select it again.',
+      timeout: (stage, seconds) => `${translate(stage)} exceeded ${seconds} seconds. The underlying task cannot be stopped. Refresh the page before retrying.`,
+      success: 'PPTX generated and download requested. Check Chrome downloads and the text and icons in your slides.',
+      error: message => `Export failed: ${message}`,
+      missingLibrary: 'The conversion library did not load. Check Tampermonkey’s @require downloads and refresh the page.',
+    },
+  };
 
-  function button(label, action) {
+  function translate(key, ...args) {
+    const value = messages[language][key];
+    return typeof value === 'function' ? value(...args) : value;
+  }
+
+  function setStatus(key, ...args) {
+    statusKey = key;
+    statusArgs = args;
+    status.textContent = translate(key, ...args);
+  }
+
+  function button(key, action) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = label;
+    btn.dataset.label = key;
+    btn.textContent = translate(key);
     btn.style.cssText = 'padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#0f172a;font:inherit;cursor:pointer;';
     btn.addEventListener('click', action);
     controls.append(btn);
     return btn;
   }
 
-  const pickButton = button('选择区域', startPicking);
-  const parentButton = button('扩大到父级', () => {
+  const pickButton = button('pick', startPicking);
+  const parentButton = button('parent', () => {
     if (!usable(selected?.parentElement)) return;
     history.push(selected);
     selected = selected.parentElement;
     showSelection();
   });
-  const backButton = button('缩回一级', () => {
+  const backButton = button('back', () => {
     const previous = history.pop();
     selected = previous?.isConnected ? previous : null;
     showSelection();
   });
-  const exportButton = button('导出 PPTX', exportSelection);
-  const pseudoButton = button('装饰：关', () => {
+  const exportButton = button('export', exportSelection);
+  const pseudoButton = button('pseudo', () => {
     includePseudoElements = !includePseudoElements;
-    pseudoButton.textContent = `装饰：${includePseudoElements ? '开' : '关'}`;
-    status.textContent = includePseudoElements
-      ? '包含 ::before/::after 装饰；复杂装饰可能需要截图，耗时更长。'
-      : '跳过 ::before/::after 装饰；保留普通文字、形状和 SVG。';
+    pseudoButton.textContent = translate('pseudo');
+    setStatus(includePseudoElements ? 'pseudoOn' : 'pseudoOff');
   });
-  const cancelButton = button('取消 / Esc', cancelSelection);
+  const cancelButton = button('cancel', cancelSelection);
+  const languageButton = document.createElement('button');
+  languageButton.type = 'button';
+  languageButton.textContent = '中文 / English';
+  languageButton.style.cssText = pickButton.style.cssText;
+  languageButton.addEventListener('click', () => {
+    language = language === 'zh' ? 'en' : 'zh';
+    GM_setValue('language', language);
+    for (const btn of controls.children) {
+      if (btn.dataset.label) btn.textContent = translate(btn.dataset.label);
+    }
+    panel.setAttribute('lang', language === 'zh' ? 'zh-CN' : 'en');
+    setStatus(statusKey, ...statusArgs);
+  });
+  controls.append(languageButton);
+  panel.setAttribute('lang', language === 'zh' ? 'zh-CN' : 'en');
 
   function usable(el) {
     if (!(el instanceof Element) || !el.isConnected) return false;
@@ -143,10 +217,10 @@ async function forcePptxFont(blob) {
     if (usable(selected)) {
       const rect = selected.getBoundingClientRect();
       const component = selected.getAttribute('data-d-component');
-      status.textContent = `已选择 ${selected.tagName.toLowerCase()}${component ? ` [${component}]` : ''}\n${Math.round(rect.width)} × ${Math.round(rect.height)} px。确认蓝框范围，再导出。`;
+      setStatus('selected', `${selected.tagName.toLowerCase()}${component ? ` [${component}]` : ''}`, Math.round(rect.width), Math.round(rect.height));
     } else {
       selected = null;
-      status.textContent = '点击“选择区域”，再点击需要导出的卡片。';
+      setStatus('ready');
     }
     drawOutline();
     refreshButtons();
@@ -158,7 +232,7 @@ async function forcePptxFont(blob) {
     hovered = null;
     selected = null;
     history.length = 0;
-    status.textContent = '移动鼠标查看蓝框，点击选中；Esc 取消。';
+    setStatus('picking');
     drawOutline();
     refreshButtons();
   }
@@ -220,7 +294,10 @@ async function forcePptxFont(blob) {
         new Promise((_, reject) => {
           timer = setTimeout(() => {
             needsReload = true;
-            reject(new Error(`${stage}超过 ${ms / 1000} 秒。底层任务无法中断，请刷新页面后重试。`));
+            const error = new Error(translate('timeout', stage, ms / 1000));
+            error.uiKey = 'timeout';
+            error.uiArgs = [stage, ms / 1000];
+            reject(error);
           }, ms);
         }),
       ]);
@@ -233,16 +310,20 @@ async function forcePptxFont(blob) {
     if (busy || needsReload || picking || !usable(selected) || !exporter) return;
     const target = selected;
     busy = true;
-    status.textContent = '正在等待页面字体加载……';
+    setStatus('waitingFonts');
     drawOutline();
     refreshButtons();
     // 工具位于 body 的独立子节点，允许选择的区域不包含它；转换时保持可见。
     try {
-      await withTimeout(document.fonts.ready, 10000, '等待字体');
-      status.textContent = '正在等待所选区域的图片加载……';
-      await withTimeout(Promise.all(Array.from(target.querySelectorAll('img'), img => img.decode().catch(() => {}))), 10000, '等待图片');
-      if (!usable(target)) throw new Error('目标已消失或被隐藏，请重新选择。');
-      status.textContent = '正在转换 PPTX，请等待；大型区域可能需要更长时间。';
+      await withTimeout(document.fonts.ready, 10000, 'fonts');
+      setStatus('waitingImages');
+      await withTimeout(Promise.all(Array.from(target.querySelectorAll('img'), img => img.decode().catch(() => {}))), 10000, 'images');
+      if (!usable(target)) {
+        const error = new Error(translate('missingTarget'));
+        error.uiKey = 'missingTarget';
+        throw error;
+      }
+      setStatus('convertingPptx');
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const rawBlob = await withTimeout(exporter.exportToPptx(target, {
         fileName: `chatgpt-card-${stamp}.pptx`,
@@ -251,9 +332,9 @@ async function forcePptxFont(blob) {
         includePseudoElements,
         // 由脚本在成功后下载；超时的底层任务即使稍后完成也不会突然下载。
         skipDownload: true,
-      }), 30000, '转换 PPTX');
-      status.textContent = '正在统一为 Microsoft YaHei UI 字体……';
-      const blob = await withTimeout(forcePptxFont(rawBlob), 10000, '统一字体');
+      }), 30000, 'converting');
+      setStatus('settingFont');
+      const blob = await withTimeout(forcePptxFont(rawBlob), 10000, 'font');
       const url = URL.createObjectURL(blob);
       try {
         const link = document.createElement('a');
@@ -265,10 +346,11 @@ async function forcePptxFont(blob) {
       } finally {
         setTimeout(() => URL.revokeObjectURL(url), 10000);
       }
-      status.textContent = '已生成 PPTX 并发起下载。请检查 Chrome 下载列表及 PPT 中的文字、图标。';
+      setStatus('success');
     } catch (error) {
       console.error('[ChatGPT PPTX]', error);
-      status.textContent = `导出失败：${error?.message || String(error)}`;
+      if (error?.uiKey) setStatus(error.uiKey, ...(error.uiArgs || []));
+      else setStatus('error', error?.message || String(error));
     } finally {
       busy = false;
       drawOutline();
@@ -277,8 +359,8 @@ async function forcePptxFont(blob) {
   }
 
   showSelection();
-  if (!exporter) status.textContent = '转换库未加载。请检查 Tampermonkey 的 @require 下载状态，再刷新页面。';
+  if (!exporter) setStatus('missingLibrary');
   if (typeof GM_registerMenuCommand === 'function') {
-    GM_registerMenuCommand('选择区域并导出 PPTX', startPicking);
+    GM_registerMenuCommand('选择区域 / Select region → PPTX', startPicking);
   }
 })();

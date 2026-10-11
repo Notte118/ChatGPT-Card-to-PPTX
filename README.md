@@ -2,6 +2,8 @@
 
 一个 Tampermonkey 用户脚本：在 ChatGPT 页面点选卡片或其他 DOM 区域，导出为可编辑的 PowerPoint 文件。
 
+[English instructions](#english)
+
 ## 功能
 
 - 鼠标悬停高亮区域，点击选中；优先选择 `data-d-component="box"`。
@@ -9,6 +11,7 @@
 - 普通文字和形状导出为 PPT 元素，SVG 保留矢量。
 - 导出文件中的文字及主题字体统一为 **Microsoft YaHei UI**。
 - 可选择是否包含 `::before` / `::after` 装饰，默认关闭。
+- 点击“中文 / English”切换按钮、状态提示和功能描述；语言选择会保存。
 - 显示导出阶段，转换超过 30 秒提示超时。
 - 修正 JSZip 在用户脚本代理环境中的消息调度兼容问题。
 
@@ -18,8 +21,6 @@
 2. 打开 `chrome://extensions/`，进入 Tampermonkey 的详情，开启“允许用户脚本”，并允许访问 `chatgpt.com`。旧版本 Chrome 可按 Tampermonkey 提示启用开发者模式。
 3. 点击 [安装用户脚本](https://raw.githubusercontent.com/Notte118/ChatGPT-Card-to-PPTX/main/chatgpt-card-export.user.js)，在 Tampermonkey 界面确认安装。如果显示源码，则新建脚本，将模板全部替换为 [`chatgpt-card-export.user.js`](./chatgpt-card-export.user.js) 的内容，保存。
 4. 刷新 ChatGPT 页面，右下角应出现工具面板。
-
-只安装 `.user.js` 文件。`check` 开头的文件是开发检查，不需要添加到 Tampermonkey。
 
 依赖通过固定版本的 `@require` 获取并由 Tampermonkey 缓存。首次安装需要能够访问 jsDelivr。
 
@@ -41,23 +42,6 @@
 - 超时提示不会终止转换库内部任务；发生超时后请刷新页面再重试。
 - 工具本身没有上传聊天内容的逻辑；转换库在处理图片等资源时可能加载它们的原始 URL。
 
-## 本地检查
-
-需要 Node.js，无需安装 npm 依赖：
-
-```powershell
-node .\check.cjs
-```
-
-调度及字体检查需要先下载固定版本的转换包到当前目录：
-
-```powershell
-Invoke-WebRequest 'https://cdn.jsdelivr.net/npm/dom-to-pptx@2.1.2/dist/dom-to-pptx.bundle.js' -OutFile '.\dom-to-pptx.bundle.js'
-node .\check-scheduler.cjs
-```
-
-这些检查验证脚本状态及 ZIP 处理逻辑；浏览器集成仍需在 Chrome/Tampermonkey 中检查。
-
 ## 依赖与许可
 
 本项目采用 [MIT License](./LICENSE)。第三方依赖保持各自的许可：
@@ -66,3 +50,37 @@ node .\check-scheduler.cjs
 - [JSZip](https://github.com/Stuk/jszip)，固定版本 3.10.1，采用其 MIT 许可选项。
 
 本项目是独立的社区工具，与 OpenAI/ChatGPT 无隶属关系。
+
+## English
+
+A Tampermonkey userscript that lets you select a ChatGPT card or page region and export it as an editable PowerPoint presentation.
+
+### Installation
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) in Chrome.
+2. Open `chrome://extensions/`, select Tampermonkey’s details, enable **Allow User Scripts** and grant access to `chatgpt.com`. On older Chrome versions, follow Tampermonkey’s instructions to enable Developer Mode.
+3. [Install the userscript](https://raw.githubusercontent.com/Notte118/ChatGPT-Card-to-PPTX/main/chatgpt-card-export.user.js). If Chrome displays the source, create a new Tampermonkey script, replace the template with the full source, and save.
+4. Refresh ChatGPT. The export panel appears in the lower right. Click **中文 / English** to switch languages; your choice is saved.
+
+Dependencies use pinned `@require` versions and are cached by Tampermonkey. jsDelivr access is required for the initial download.
+
+### Controls
+
+| 中文 | English | Action |
+| --- | --- | --- |
+| 选择区域 | Select region | Hover to preview the outline, then click a card. |
+| 扩大到父级 | Select parent | Expand the selection to its parent element. |
+| 缩回一级 | Go back | Return to the previous, smaller selection. |
+| 导出 PPTX | Export PPTX | Convert the selected region and download a PPTX. |
+| 装饰：开 / 关 | Decorations: On / Off | Include or skip CSS `::before` / `::after` decorations. Default: Off. |
+| 取消 / Esc | Cancel / Esc | Clear the selection or exit selection mode. |
+
+### Export behavior
+
+- Regular text and shapes become editable PPT elements; SVGs remain vector graphics.
+- PPT text and theme fonts use **Microsoft YaHei UI**. The font must be installed on the computer opening the file; it is not embedded. Text inside SVGs and raster images is not changed.
+- Complex effects may differ from the browser view. Images and Canvas content remain images.
+- Conversion displays its current stage and reports a timeout after 30 seconds. Refresh the page before retrying a timed-out conversion.
+- The script does not upload chat content. Processing images may load their original resource URLs.
+
+Licensed under [MIT](./LICENSE). Uses [dom-to-pptx 2.1.2](https://github.com/atharva9167j/dom-to-pptx) and [JSZip 3.10.1](https://github.com/Stuk/jszip), under their MIT licenses. This is an independent community tool with no affiliation to OpenAI or ChatGPT.
