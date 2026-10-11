@@ -1,0 +1,6 @@
+# 固定版本的第三方包由 @require 获取；本地诊断下载不提交。
+dom-to-pptx.bundle.js
+node_modules/
+*.pptx
+*.log
+.DS_Store
