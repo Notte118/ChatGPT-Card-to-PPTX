@@ -4,6 +4,16 @@
 
 [English instructions](#english)
 
+## 效果展示 / Preview
+
+左图为浏览器中的原始卡片，右图为导出后的 PPTX。导出文字及主题**默认使用 Microsoft YaHei UI 字体**；字体变化和转换过程可能带来排版差异。
+
+Browser card (left) and exported PPTX (right). Exported text and theme fonts **use Microsoft YaHei UI by default**; font changes and conversion may affect the layout.
+
+| 浏览器原始卡片 / Browser card | 导出后的 PPTX / Exported PPTX |
+| --- | --- |
+| ![浏览器中的 ChatGPT 卡片 / Original ChatGPT card](assets/browser-preview.png) | ![导出后的 PowerPoint 页面 / Exported PowerPoint slide](assets/pptx-preview.png) |
+
 ## 功能
 
 - 鼠标悬停高亮区域，点击选中；优先选择 `data-d-component="box"`。
