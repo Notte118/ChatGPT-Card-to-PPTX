@@ -2,6 +2,10 @@
 
 一个 Tampermonkey 用户脚本：在 ChatGPT 页面点选卡片或其他 DOM 区域，导出为可编辑的 PowerPoint 文件。
 
+本项目面向 ChatGPT 10 月更新后的富文本 UI 使用场景：回复中的卡片、横向布局、文字和图标可以组合成更丰富的内容。本工具将这些已渲染的区域提取为 PPTX，方便继续编辑和用于汇报。
+
+本项目的用户脚本和文档全部由 **OpenAI Codex** 开发与编写，维护者负责提出需求、实际使用验证和发布。底层转换使用下方列出的第三方开源库。
+
 [English instructions](#english)
 
 ## 效果展示 / Preview
@@ -64,6 +68,10 @@ Browser card (left) and exported PPTX (right). Exported text and theme fonts **u
 ## English
 
 A Tampermonkey userscript that lets you select a ChatGPT card or page region and export it as an editable PowerPoint presentation.
+
+This project targets the rich-text UI seen in ChatGPT after the October update: cards, rows, text and icons combined into richer responses. It exports these rendered regions to PPTX for further editing and presentations.
+
+The userscript and documentation were developed and written entirely by **OpenAI Codex**. The maintainer provided requirements, validated the tool in actual use and published it. Conversion relies on the third-party open-source libraries credited below.
 
 ### Installation
 
